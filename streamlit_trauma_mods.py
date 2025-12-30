@@ -1,29 +1,23 @@
 
-
 import numpy as np
 import pandas as pd
 import streamlit as st
 import joblib
-import shap
-import matplotlib.pyplot as plt
 
-# ======================
-# Page config
-# ======================
+# ===============================
+# Page configuration
+# ===============================
 st.set_page_config(
-    page_title="MODS Prediction (XGBoost)",
+    page_title="MODS Prediction (RF Model)",
     page_icon="🏥",
     layout="wide"
 )
 
-# ======================
+# ===============================
 # Custom CSS
-# ======================
+# ===============================
 st.markdown("""
 <style>
-    .main {
-        padding: 2rem 3rem;
-    }
     h1, h2, h3 {
         color: #0e4c92;
     }
@@ -33,144 +27,119 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ======================
+# ===============================
 # Load model
-# ======================
+# ===============================
 @st.cache_resource
 def load_model():
-    return joblib.load("xgb_mods_model.joblib")
+    return joblib.load("rf_mods_model.joblib")
 
 model = load_model()
 
-# ======================
-# Feature definition
-# ======================
-FEATURES = [
-    "platelets_min",
-    "riss",
-    "sbp_min",
-    "bun_max",
-    "temperature_max",
-    "admission_age",
-    "renal",
-    "invasive_line_1stday",
-    "mechvent",
-    "sofa_1stday"
-]
-
-FEATURES_DISPLAY = [
-    "Platelet Count (×10⁹/L)",
-    "RISS",
-    "Systolic BP (mmHg)",
-    "BUN (mg/dL)",
-    "Temperature (°C)",
-    "Age (years)",
-    "Renal Score",
-    "Invasive Line Use",
-    "Mechanical Ventilation",
-    "SOFA Score"
-]
-
-# ======================
+# ===============================
 # Title
-# ======================
+# ===============================
 st.title("🏥 MODS Prediction in Trauma Patients with Sepsis")
-st.markdown("### XGBoost-based Clinical Prediction Model")
+st.caption("Random Forest–based prediction model")
 
+# ===============================
+# Layout
+# ===============================
 col1, col2 = st.columns([1, 2])
 
-# ======================
-# Input panel
-# ======================
+# ===============================
+# Input section
+# ===============================
 with col1:
     st.subheader("Patient Parameters")
 
-    platelets = st.slider(FEATURES_DISPLAY[0], 0, 1000, 200)
-    riss = st.slider(FEATURES_DISPLAY[1], 0, 75, 25)
-    sbp = st.slider(FEATURES_DISPLAY[2], 50, 200, 110)
-    bun = st.slider(FEATURES_DISPLAY[3], 0, 200, 20)
-    temp = st.slider(FEATURES_DISPLAY[4], 34.0, 42.0, 37.0, step=0.1)
-    age = st.slider(FEATURES_DISPLAY[5], 18, 100, 60)
-    renal = st.slider(FEATURES_DISPLAY[6], 0, 4, 0)
-    invasive = st.selectbox(FEATURES_DISPLAY[7], ["No", "Yes"])
-    mechvent = st.selectbox(FEATURES_DISPLAY[8], ["No", "Yes"])
-    sofa = st.slider(FEATURES_DISPLAY[9], 0, 24, 6)
+    platelets = st.slider("Platelet Count (×10⁹/L)", 0, 1000, 200)
+    riss = st.slider("RISS", 0, 100, 25)
+    sbp = st.slider("Systolic Blood Pressure (mmHg)", 40, 200, 110)
+    bun = st.slider("BUN (mg/dL)", 0, 200, 20)
+    temp = st.slider("Temperature (°C)", 30.0, 43.0, 37.0, step=0.1)
+    age = st.slider("Age", 18, 100, 60)
+    renal = st.slider("Renal Score", 0, 4, 0)
+    invasive_line = st.selectbox("Invasive Line (Day 1)", ["No", "Yes"])
+    mechvent = st.selectbox("Mechanical Ventilation", ["No", "Yes"])
+    sofa = st.slider("SOFA Score (Day 1)", 0, 24, 6)
 
-    if st.button("Predict MODS Risk"):
-        input_data = pd.DataFrame([[
-            platelets,
-            riss,
-            sbp,
-            bun,
-            temp,
-            age,
-            renal,
-            1 if invasive == "Yes" else 0,
-            1 if mechvent == "Yes" else 0,
-            sofa
-        ]], columns=FEATURES)
+    predict_button = st.button("Predict MODS Risk")
 
-        pred_prob = model.predict_proba(input_data)[0, 1]
+# ===============================
+# Prediction
+# ===============================
+if predict_button:
+    # Prepare input
+    input_data = pd.DataFrame([[
+        platelets,
+        riss,
+        sbp,
+        bun,
+        temp,
+        age,
+        renal,
+        1 if invasive_line == "Yes" else 0,
+        1 if mechvent == "Yes" else 0,
+        sofa
+    ]], columns=[
+        "platelets_min",
+        "riss",
+        "sbp_min",
+        "bun_max",
+        "temperature_max",
+        "admission_age",
+        "renal",
+        "invasive_line_1stday",
+        "mechvent",
+        "sofa_1stday"
+    ])
 
-        # ======================
-        # Output
-        # ======================
-        with col2:
-            st.subheader("Prediction Result")
+    # Predict probability
+    prob = model.predict_proba(input_data)[0, 1]
 
-            color = "red" if pred_prob >= 0.5 else "green"
-            st.markdown(
-                f"<h2 style='text-align:center;color:{color};'>"
-                f"MODS Probability: {pred_prob:.2%}</h2>",
-                unsafe_allow_html=True
-            )
+    with col2:
+        st.subheader("Prediction Result")
 
-            if pred_prob < 0.1:
-                st.success("Low Risk of MODS")
-            elif pred_prob < 0.5:
-                st.warning("Moderate Risk of MODS")
-            else:
-                st.error("High Risk of MODS")
+        st.markdown(
+            f"""
+            <h2 style='text-align:center;'>
+            MODS Probability: 
+            <span style='color:{'red' if prob >= 0.5 else 'green'}'>
+            {prob:.2%}
+            </span>
+            </h2>
+            """,
+            unsafe_allow_html=True
+        )
 
-            # ======================
-            # SHAP explanation
-            # ======================
-            st.subheader("Model Explanation (SHAP)")
+        if prob < 0.10:
+            st.success("Low Risk of MODS")
+        elif prob < 0.50:
+            st.warning("Moderate Risk of MODS")
+        else:
+            st.error("High Risk of MODS")
 
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(input_data)
-
-            fig, ax = plt.subplots(figsize=(8, 5))
-            shap.summary_plot(
-                shap_values,
-                input_data,
-                plot_type="bar",
-                show=False
-            )
-            st.pyplot(fig)
-            plt.close(fig)
-
-# ======================
+# ===============================
 # Disclaimer
-# ======================
+# ===============================
 st.markdown("---")
 st.warning("""
 **DISCLAIMER**
 
-This prediction tool is developed for research purposes only.
-It should not be used as the sole basis for clinical decision-making.
+This tool is intended for research purposes only.
 
-Always consult qualified healthcare professionals before making
-diagnostic or treatment decisions.
+- The prediction is based on a Random Forest model trained on retrospective data.
+- It should NOT be used as the sole basis for clinical decisions.
+- Further external and prospective validation is required.
+
+Always consult qualified healthcare professionals.
 """)
 
-# ======================
+# ===============================
 # Footer
-# ======================
+# ===============================
 st.markdown(
-    "<div style='text-align:center;color:gray;'>"
-    "© 2025 MODS Prediction Model | XGBoost | Research Use Only"
-    "</div>",
+    "<p style='text-align:center;color:gray;'>© 2024 MODS Prediction Model | Research Use Only</p>",
     unsafe_allow_html=True
 )
-
