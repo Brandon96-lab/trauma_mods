@@ -17,11 +17,9 @@ st.set_page_config(
 # =========================
 @st.cache_resource
 def load_model():
-    model = joblib.load("mods_lr_model.joblib")
-    scaler = joblib.load("mods_lr_scaler.joblib")
-    return model, scaler
+    return joblib.load("mods_lr_pipeline_v1.joblib")
 
-model, scaler = load_model()
+model = load_model()
 
 # =========================
 # Title
@@ -69,8 +67,7 @@ with col1:
             'sofa_1stday'
         ])
 
-        X_scaled = scaler.transform(X_input)
-        prob = model.predict_proba(X_scaled)[0, 1]
+        prob = model.predict_proba(input_df)[0, 1]
 
         with col2:
             st.subheader("Predicted Risk")
