@@ -155,11 +155,11 @@ with col2:
             st.subheader("Prediction Result")
             
             # 颜色逻辑
-            if prediction_prob < 0.2:
+            if prediction_prob < 0.05:
                 color = "green"
                 risk_text = "Low Risk"
                 bg_color = "#e6f4ea"
-            elif prediction_prob < 0.5:
+            elif prediction_prob < 0.2:
                 color = "#ffa500" # Orange
                 risk_text = "Moderate Risk"
                 bg_color = "#fff8e1"
